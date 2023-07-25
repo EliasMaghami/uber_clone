@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -23,13 +25,13 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   MapController mapController = MapController(
-      initMapWithUserPosition:
-          UserTrackingOption(enableTracking: true, unFollowUser: false),
-      //  const UserTrackingOption.withoutUserPosition(enableTracking: false,unFollowUser: false),
-      initPosition: GeoPoint(
-        latitude: 38.749976,
-        longitude: 30.546327,
-      ));
+    initMapWithUserPosition:
+        const UserTrackingOption(enableTracking: true, unFollowUser: false),
+    //     initPosition: GeoPoint(
+    //   latitude: 38.749976,
+    //   longitude: 30.546327,
+    // ),
+  );
 
   List<GeoPoint> geoPoint = [];
 
@@ -52,24 +54,25 @@ class _MapScreenState extends State<MapScreen> {
               child: OSMFlutter(
                 controller: mapController,
                 userTrackingOption: const UserTrackingOption(
-                    enableTracking: false, unFollowUser: false),
+                    enableTracking: true, unFollowUser: false),
                 initZoom: 15,
                 isPicker: true,
                 mapIsLoading: const SpinKitCircle(color: Colors.indigoAccent),
                 minZoomLevel: 8,
                 maxZoomLevel: 18,
                 stepZoom: 1,
+                markerOption: MarkerOption(
+                    advancedPickerMarker: MarkerIcon(
+                  iconWidget: markerIcon,
+                )),
               ),
             ),
-
-            // Container(
-            //   color: Colors.pink,
-            // ),
 
             //currentWidget
             currentWidget(),
             MyBackButton(
               onPressed: () {
+                if (geoPoint.isNotEmpty) {}
                 if (currentWidgetList.length > 1) {
                   setState(() {
                     currentWidgetList.removeLast();
@@ -101,7 +104,7 @@ class _MapScreenState extends State<MapScreen> {
     return widget;
   }
 
-  Positioned origin() {
+  Widget origin() {
     return Positioned(
       bottom: 0,
       left: 0,
@@ -109,10 +112,22 @@ class _MapScreenState extends State<MapScreen> {
       child: Padding(
         padding: const EdgeInsets.all(Dimens.large),
         child: ElevatedButton(
-          onPressed: (() {
+          onPressed: (() async {
+            GeoPoint originGeoPoint =
+                await mapController.getCurrentPositionAdvancedPositionPicker();
+
+            log("latitude:${originGeoPoint.latitude}\n longitude:${originGeoPoint.longitude}");
+            geoPoint.add(originGeoPoint);
+            markerIcon = SvgPicture.asset(
+              Assets.icons.destination,
+              height: 100,
+              width: 50,
+            );
             setState(() {
               currentWidgetList.add(CurrentWidgetStates.stateSelectDestination);
             });
+
+            mapController.init();
           }),
           child: Text('Select the origin', style: MyTextStyles.button),
         ),
@@ -120,7 +135,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Positioned destination() {
+  Widget destination() {
     return Positioned(
       bottom: 0,
       left: 0,
@@ -139,7 +154,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Positioned requestDriver() {
+  Widget requestDriver() {
     return Positioned(
       bottom: 0,
       left: 0,

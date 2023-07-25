@@ -27,9 +27,9 @@ class MyApp extends StatelessWidget {
             elevation: const MaterialStatePropertyAll(0),
             backgroundColor: MaterialStateProperty.resolveWith((states) {
               if (states.contains(MaterialState.pressed)) {
-                return Color.fromARGB(255, 6, 117, 24);
+                return const Color.fromARGB(255, 6, 117, 24);
               }
-              return Color.fromARGB(255, 2, 207, 36);
+              return const Color.fromARGB(255, 2, 207, 36);
             }),
           ),
         ),
