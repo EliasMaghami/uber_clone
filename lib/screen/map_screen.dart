@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:snap_simple/constant/dimens.dart';
 import 'package:snap_simple/gen/assets.gen.dart';
 import 'package:snap_simple/widget/back_button.dart';
@@ -24,15 +25,9 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  MapController mapController = MapController(
-    initMapWithUserPosition:
-        const UserTrackingOption(enableTracking: true, unFollowUser: false),
-    //     initPosition: GeoPoint(
-    //   latitude: 38.749976,
-    //   longitude: 30.546327,
-    // ),
-  );
-
+  String distance = "Calculating the distance";
+  String originAddress = "Address Origin:";
+  String destinationAddress = "Address destination:";
   List<GeoPoint> geoPoint = [];
 
   List currentWidgetList = [CurrentWidgetStates.stateSelectOrigin];
@@ -40,7 +35,26 @@ class _MapScreenState extends State<MapScreen> {
   Widget markerIcon = SvgPicture.asset(
     Assets.icons.origin,
     height: 100,
-    width: 40,
+    width: 50,
+  );
+  Widget originMarker = SvgPicture.asset(
+    Assets.icons.origin,
+    height: 100,
+    width: 50,
+  );
+  Widget destinationMarker = SvgPicture.asset(
+    Assets.icons.destination,
+    height: 100,
+    width: 50,
+  );
+
+  MapController mapController = MapController(
+    initMapWithUserPosition:
+        const UserTrackingOption(enableTracking: true, unFollowUser: false),
+    // initPosition: GeoPoint(
+    //   latitude: 38.749976,
+    //   longitude: 30.546327,
+    // ),
   );
 
   @override
@@ -54,7 +68,7 @@ class _MapScreenState extends State<MapScreen> {
               child: OSMFlutter(
                 controller: mapController,
                 userTrackingOption: const UserTrackingOption(
-                    enableTracking: true, unFollowUser: false),
+                    enableTracking: true, unFollowUser: true),
                 initZoom: 15,
                 isPicker: true,
                 mapIsLoading: const SpinKitCircle(color: Colors.indigoAccent),
@@ -72,12 +86,26 @@ class _MapScreenState extends State<MapScreen> {
             currentWidget(),
             MyBackButton(
               onPressed: () {
-                if (geoPoint.isNotEmpty) {}
-                if (currentWidgetList.length > 1) {
-                  setState(() {
-                    currentWidgetList.removeLast();
-                  });
+                switch (currentWidgetList.last) {
+                  case CurrentWidgetStates.stateSelectOrigin:
+                    break;
+                  case CurrentWidgetStates.stateSelectDestination:
+                    geoPoint.removeLast();
+                    markerIcon = originMarker;
+
+                    break;
+                  case CurrentWidgetStates.stateRequestDriver:
+                    mapController.advancedPositionPicker();
+                    mapController.removeMarker(geoPoint.last);
+                    geoPoint.removeLast();
+                    markerIcon = destinationMarker;
+
+                    break;
+                  default:
                 }
+                setState(() {
+                  currentWidgetList.removeLast();
+                });
               },
             ),
           ],
@@ -118,11 +146,7 @@ class _MapScreenState extends State<MapScreen> {
 
             log("latitude:${originGeoPoint.latitude}\n longitude:${originGeoPoint.longitude}");
             geoPoint.add(originGeoPoint);
-            markerIcon = SvgPicture.asset(
-              Assets.icons.destination,
-              height: 100,
-              width: 50,
-            );
+            markerIcon = destinationMarker;
             setState(() {
               currentWidgetList.add(CurrentWidgetStates.stateSelectDestination);
             });
@@ -143,10 +167,39 @@ class _MapScreenState extends State<MapScreen> {
       child: Padding(
         padding: const EdgeInsets.all(Dimens.large),
         child: ElevatedButton(
-          onPressed: (() {
+          onPressed: (() async {
+            await mapController
+                .getCurrentPositionAdvancedPositionPicker()
+                .then((value) {
+              geoPoint.add(value);
+            });
+
+            mapController.cancelAdvancedPositionPicker();
+
+            await mapController.addMarker(geoPoint.first,
+                markerIcon: MarkerIcon(
+                  iconWidget: originMarker,
+                ));
+            await mapController.addMarker(geoPoint.last,
+                markerIcon: MarkerIcon(
+                  iconWidget: destinationMarker,
+                ));
             setState(() {
               currentWidgetList.add(CurrentWidgetStates.stateRequestDriver);
             });
+
+            await distance2point(geoPoint.first, geoPoint.last).then((value) {
+              setState(() {
+                if (value <= 1000) {
+                  distance =
+                      "Distance from origin to destination${value.toInt()} m";
+                } else {
+                  distance =
+                      "Distance from origin to destination${value ~/ 1000} Km";
+                }
+              });
+            });
+            getAddress();
           }),
           child: Text('Select the destination', style: MyTextStyles.button),
         ),
@@ -155,17 +208,87 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget requestDriver() {
+    getCurrentTag();
+    mapController.zoomOut();
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Padding(
         padding: const EdgeInsets.all(Dimens.large),
-        child: ElevatedButton(
-          onPressed: (() {}),
-          child: Text('Driver Request', style: MyTextStyles.button),
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(Dimens.medium),
+                color: Colors.pinkAccent,
+              ),
+              child: Center(child: Text(distance)),
+            ),
+            const SizedBox(
+              height: Dimens.small,
+            ),
+            Container(
+              width: double.infinity,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(Dimens.medium),
+                color: Colors.pinkAccent,
+              ),
+              child: Center(child: Text("originAddress :${originAddress}")),
+            ),
+            const SizedBox(
+              height: Dimens.small,
+            ),
+            Container(
+              width: double.infinity,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(Dimens.medium),
+                color: Colors.pinkAccent,
+              ),
+              child: Center(
+                  child: Text("destinationAddress :${destinationAddress}")),
+            ),
+            const SizedBox(
+              height: Dimens.small,
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: (() {}),
+                child: Text('Driver Request', style: MyTextStyles.button),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  getAddress() async {
+    try {
+      await placemarkFromCoordinates(
+              geoPoint.last.latitude, geoPoint.last.longitude)
+          .then((List<Placemark> placeMarkList) {
+        setState(() {
+          destinationAddress =
+              "${placeMarkList.first.locality}${placeMarkList.first.thoroughfare}${placeMarkList[2].name}";
+        });
+      });
+      await placemarkFromCoordinates(
+              geoPoint.first.latitude, geoPoint.first.longitude)
+          .then((List<Placemark> placeMarkList) {
+        setState(() {
+          originAddress =
+              "${placeMarkList.first.locality}${placeMarkList.first.thoroughfare}${placeMarkList[2].name}";
+        });
+      });
+    } catch (e) {
+      originAddress = "Address not found";
+      destinationAddress = "Address not found";
+    }
   }
 }

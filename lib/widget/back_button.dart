@@ -5,7 +5,7 @@ import 'package:snap_simple/constant/dimens.dart';
 class MyBackButton extends StatelessWidget {
   Function() onPressed;
 
-  MyBackButton({required this.onPressed});
+  MyBackButton({super.key, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
